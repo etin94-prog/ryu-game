@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="ko">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+        <meta name="robots" content="noindex, nofollow" />
+        <title>Survivor</title>
+        <style id="gateStyle">
+            html,
+            body {
+                margin: 0;
+                height: 100%;
+                background: #0d0b16;
+                color: #eee;
+                font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+            }
+            #gate {
+                min-height: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 16px;
+                box-sizing: border-box;
+            }
+            #gate form {
+                width: 100%;
+                max-width: 320px;
+                background: #171427;
+                border: 1px solid #2c2845;
+                border-radius: 14px;
+                padding: 24px 20px;
+                text-align: center;
+            }
+            #gate h1 {
+                font-size: 20px;
+                margin: 0 0 16px;
+            }
+            #gate input[type='password'] {
+                width: 100%;
+                box-sizing: border-box;
+                padding: 12px;
+                border-radius: 10px;
+                border: 1px solid #3a3560;
+                background: #0d0b16;
+                color: #fff;
+                font-size: 16px;
+            }
+            #gate label {
+                display: block;
+                margin: 12px 0;
+                font-size: 14px;
+                color: #bbb;
+            }
+            #gate button {
+                width: 100%;
+                padding: 12px;
+                border: 0;
+                border-radius: 10px;
+                background: #5b6ee1;
+                color: #fff;
+                font-size: 16px;
+            }
+            #gate button:disabled {
+                opacity: 0.6;
+            }
+            #gateBar {
+                display: none;
+                height: 14px;
+                margin-top: 16px;
+                border-radius: 7px;
+                background: rgba(255, 255, 255, 0.18);
+                overflow: hidden;
+            }
+            #gateBar i {
+                display: block;
+                width: 0;
+                height: 100%;
+                border-radius: 7px;
+                background: linear-gradient(90deg, #ff8fb1, #ffd36e);
+                transition: width 0.15s linear;
+            }
+            #gatePct {
+                min-height: 20px;
+                margin-top: 8px;
+                font-size: 14px;
+                color: #fff;
+            }
+            #gateMsg {
+                min-height: 20px;
+                margin-top: 10px;
+                font-size: 14px;
+                color: #ff9ab0;
+            }
+        </style>
+    </head>
+    <body>
+        <div id="gate">
+            <form id="gateForm" autocomplete="off">
+                <h1>🔒 비밀번호를 입력해 주세요</h1>
+                <input id="gatePw" type="password" autocomplete="current-password" autofocus />
+                <label><input id="gateRemember" type="checkbox" checked /> 이 기기에서 기억하기</label>
+                <button id="gateBtn" type="submit">들어가기</button>
+                <div id="gateBar"><i></i></div>
+                <div id="gatePct"></div>
+                <div id="gateMsg" role="status"></div>
+            </form>
+        </div>
+        <script>
+            (function () {
+                const META = {"v":1,"title":"류 서바이버즈","salt":"rBMk7bDatOTGCMq8mWQFSw==","iterations":600000,"tracks":[{"file":"t1.bin","type":"audio/mp4","group":"rest"},{"file":"t2.bin","type":"audio/mp4","group":"rest"},{"file":"t3.bin","type":"audio/mp4","group":"rest"},{"file":"t4.bin","type":"audio/mp4","group":"rest"},{"file":"t5.bin","type":"audio/mp4","group":"rest"},{"file":"t6.bin","type":"audio/mp4","group":"rest"},{"file":"t7.bin","type":"audio/mp4","group":"rest"},{"file":"t8.bin","type":"audio/mp4","group":"rest"},{"file":"t9.bin","type":"audio/mp4","group":"rest"},{"file":"t10.bin","type":"audio/mp4","group":"rest"},{"file":"t11.bin","type":"audio/mp4","group":"rest"},{"file":"t12.bin","type":"audio/mp4","group":"rest"},{"file":"t13.bin","type":"audio/mp4","group":"rest"},{"file":"t14.bin","type":"audio/mp4","group":"rest"},{"file":"t15.bin","type":"audio/mp4","group":"rest"},{"file":"t16.bin","type":"audio/mp4","group":"rest"},{"file":"t17.bin","type":"audio/mp4","group":"rest"},{"file":"t18.bin","type":"audio/mp4","group":"rest"},{"file":"t19.bin","type":"audio/mp4","group":"rest"},{"file":"t20.bin","type":"audio/mp4","group":"rest"},{"file":"t21.bin","type":"audio/mp4","group":"rest"},{"file":"t22.bin","type":"audio/mp4","group":"rest"},{"file":"t23.bin","type":"audio/mp4","group":"rest"},{"file":"t24.bin","type":"audio/mp4","group":"rest"},{"file":"t25.bin","type":"audio/mp4","group":"rest"},{"file":"t26.bin","type":"audio/mp4","group":"rest"},{"file":"t27.bin","type":"audio/mp4","group":"rest"},{"file":"t28.bin","type":"audio/mp4","group":"siren"}],"appParts":3,"appSize":99266889,"maxSeconds":121};
+                const STORE = 'gate.key.' + META.salt;
+                const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+                const toB64 = (u8) => btoa(String.fromCharCode.apply(null, u8));
+                const msg = document.getElementById('gateMsg');
+                const btn = document.getElementById('gateBtn');
+
+                async function derive(pw, extractable) {
+                    const base = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, [
+                        'deriveKey'
+                    ]);
+                    return crypto.subtle.deriveKey(
+                        { name: 'PBKDF2', salt: b64(META.salt), iterations: META.iterations, hash: 'SHA-256' },
+                        base,
+                        { name: 'AES-GCM', length: 256 },
+                        extractable,
+                        ['decrypt']
+                    );
+                }
+
+                // The loading bar (shown while the game file comes down).
+                const bar = document.getElementById('gateBar');
+                const pct = document.getElementById('gatePct');
+                function progress(done, total) {
+                    bar.style.display = 'block';
+                    const mb = (n) => (n / 1048576).toFixed(0);
+                    if (total) {
+                        const f = Math.min(1, done / total);
+                        bar.firstElementChild.style.width = (f * 100).toFixed(1) + '%';
+                        pct.textContent = f < 1 ? `불러오는 중… ${Math.round(f * 100)}% (${mb(done)} / ${mb(total)}MB)` : '거의 다 됐어요… 게임을 준비하고 있어요';
+                    } else {
+                        bar.firstElementChild.style.width = '100%';
+                        pct.textContent = `불러오는 중… ${mb(done)}MB`;
+                    }
+                }
+
+                // The bundle in pieces (data/app-1.bin ..): read one after another, joined, then decrypted.
+                async function fetchParts(key, count, size, onProgress) {
+                    const buf = new Uint8Array(size);
+                    let at = 0;
+                    onProgress(0, size);
+                    for (let i = 1; i <= count; i++) {
+                        const res = await fetch('data/app-' + i + '.bin', { cache: 'no-cache' });
+                        if (!res.ok) throw new Error('fetch app-' + i);
+                        if (res.body && res.body.getReader) {
+                            const reader = res.body.getReader();
+                            for (;;) {
+                                const step = await reader.read();
+                                if (step.done) break;
+                                buf.set(step.value, at);
+                                at += step.value.length;
+                                onProgress(at, size);
+                            }
+                        } else {
+                            const part = new Uint8Array(await res.arrayBuffer());
+                            buf.set(part, at);
+                            at += part.length;
+                            onProgress(at, size);
+                        }
+                    }
+                    if (at !== size) throw new Error('fetch app: ' + at + ' of ' + size);
+                    return crypto.subtle.decrypt({ name: 'AES-GCM', iv: buf.slice(0, 12) }, key, buf.slice(12));
+                }
+
+                async function fetchDecrypt(key, file, onProgress) {
+                    const res = await fetch('data/' + file, { cache: 'no-cache' });
+                    if (!res.ok) throw new Error('fetch ' + file);
+                    let buf;
+                    if (onProgress && res.body && res.body.getReader) {
+                        // read in pieces so the bar can move
+                        const total = Number(res.headers.get('Content-Length')) || 0;
+                        const reader = res.body.getReader();
+                        const parts = [];
+                        let done = 0;
+                        onProgress(0, total);
+                        for (;;) {
+                            const step = await reader.read();
+                            if (step.done) break;
+                            parts.push(step.value);
+                            done += step.value.length;
+                            onProgress(done, total);
+                        }
+                        buf = new Uint8Array(done);
+                        let at = 0;
+                        for (const part of parts) {
+                            buf.set(part, at);
+                            at += part.length;
+                        }
+                        onProgress(done, done);
+                    } else buf = new Uint8Array(await res.arrayBuffer());
+                    return crypto.subtle.decrypt({ name: 'AES-GCM', iv: buf.slice(0, 12) }, key, buf.slice(12));
+                }
+
+                // A wrong key shows up as a failed decrypt; anything else (no network,
+                // a download cut short, the phone short of memory) is not the password's fault.
+                const wrongKey = (err) => !!err && err.name === 'OperationError';
+
+                async function launch(key, onUnlocked) {
+                    // Throws on a wrong key (GCM tag mismatch).
+                    const plain = META.appParts ? await fetchParts(key, META.appParts, META.appSize, progress) : await fetchDecrypt(key, 'app.bin', progress);
+                    if (onUnlocked) onUnlocked();
+                    const app = JSON.parse(new TextDecoder().decode(plain));
+                    // BGM: each track decrypts lazily the first time it is needed.
+                    const loaders = META.tracks.map((t) => {
+                        let p = null;
+                        const load = () =>
+                            (p =
+                                p ||
+                                fetchDecrypt(key, t.file).then((buf) =>
+                                    URL.createObjectURL(new Blob([buf], { type: t.type }))
+                                ));
+                        return { group: t.group || 'rest', load };
+                    });
+                    window.__BGM_TRACKS = Promise.resolve({
+                        first: loaders.filter((l) => l.group === 'first').map((l) => l.load),
+                        rest: loaders.filter((l) => l.group !== 'first' && l.group !== 'later' && l.group !== 'siren').map((l) => l.load),
+                        siren: (loaders.find((l) => l.group === 'siren') || {}).load || null,
+                        later: loaders.filter((l) => l.group === 'later').map((l) => l.load),
+                        maxSeconds: META.maxSeconds || 0
+                    });
+                    window.__ART_IMAGES = app.art || {};
+                    document.getElementById('gateStyle').remove();
+                    const style = document.createElement('style');
+                    style.textContent = app.css;
+                    document.head.appendChild(style);
+                    document.title = META.title || 'Game';
+                    document.body.innerHTML = app.body;
+                    const s = document.createElement('script');
+                    s.src = URL.createObjectURL(new Blob([app.js], { type: 'text/javascript' }));
+                    document.body.appendChild(s);
+                }
+
+                async function tryStored() {
+                    let raw = null;
+                    try {
+                        raw = localStorage.getItem(STORE);
+                    } catch (e) {}
+                    if (!raw) return false;
+                    // remembered: no need to type anything, just wait for the download
+                    const form = document.getElementById('gateForm');
+                    const wait = document.createElement('h1');
+                    wait.textContent = '⏳ 게임을 불러오는 중이에요';
+                    const hide = [].filter.call(form.children, (el) => el !== bar && el !== pct);
+                    hide.forEach((el) => (el.style.display = 'none'));
+                    form.insertBefore(wait, form.firstChild);
+                    const show = () => hide.forEach((el) => (el.style.display = ''));
+                    try {
+                        const key = await crypto.subtle.importKey('raw', b64(raw), 'AES-GCM', false, ['decrypt']);
+                        await launch(key);
+                        return true;
+                    } catch (e) {
+                        wait.remove();
+                        bar.style.display = 'none';
+                        pct.textContent = '';
+                        show();
+                        if (wrongKey(e)) {
+                            // the password was changed since: forget the old one
+                            try {
+                                localStorage.removeItem(STORE);
+                            } catch (e2) {}
+                        } else {
+                            // keep the remembered password; this was a loading problem
+                            hide.forEach((el) => (el.style.display = 'none'));
+                            const retry = document.createElement('h1');
+                            retry.innerHTML = '😢 불러오지 못했어요.<br><button type="button" style="margin-top:14px;padding:12px 22px;font-size:16px;border-radius:12px">다시 시도</button>';
+                            retry.querySelector('button').onclick = () => location.reload();
+                            form.insertBefore(retry, form.firstChild);
+                        }
+                        return false;
+                    }
+                }
+
+                document.getElementById('gateForm').addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                    const pw = document.getElementById('gatePw').value;
+                    const remember = document.getElementById('gateRemember').checked;
+                    if (!pw) return;
+                    btn.disabled = true;
+                    msg.textContent = '여는 중... (처음에는 조금 걸려요)';
+                    try {
+                        const key = await derive(pw, remember);
+                        // (remembered as soon as the password is known to be right, before the game starts)
+                        const raw = remember ? toB64(new Uint8Array(await crypto.subtle.exportKey('raw', key))) : null;
+                        await launch(key, () => {
+                            msg.textContent = '맞아요! 게임을 불러오는 중…';
+                            if (!raw) return;
+                            try {
+                                localStorage.setItem(STORE, raw);
+                            } catch (e2) {}
+                        });
+                    } catch (err) {
+                        bar.style.display = 'none';
+                        pct.textContent = '';
+                        msg.textContent = wrongKey(err) ? '비밀번호가 틀렸어요.' : '불러오지 못했어요. 인터넷 연결을 확인하고 다시 눌러 주세요.';
+                        btn.disabled = false;
+                    }
+                });
+
+                if (!window.crypto || !crypto.subtle) {
+                    msg.textContent = 'https 주소로 접속해 주세요.';
+                    btn.disabled = true;
+                } else {
+                    tryStored();
+                }
+            })();
+        </script>
+    </body>
+</html>
